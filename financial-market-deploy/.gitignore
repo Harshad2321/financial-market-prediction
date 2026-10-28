@@ -1,5 +1,0 @@
-.venv/
-*.zip.part*
-__pycache__/
-*.log
-*.pid
