@@ -121,7 +121,7 @@ def train_classification_models(
     }
 
     # Random Forest Classifier
-    rf = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=random_state)
+    rf = RandomForestClassifier(n_estimators=2, max_depth=5, random_state=random_state)
     rf.fit(X_train_scaled, y_train)
     rf_probs = rf.predict_proba(X_test_scaled)[:, 1]
     results["random_forest"] = {
@@ -136,7 +136,7 @@ def train_classification_models(
     # XGBoost Classifier
     if XGBOOST_AVAILABLE and XGBClassifier is not None:
         xgb = XGBClassifier(
-            n_estimators=100,
+            n_estimators=2,
             max_depth=3,
             learning_rate=0.05,
             random_state=random_state,
@@ -191,7 +191,7 @@ def train_regression_models(df: pd.DataFrame, target_col: str = "Close") -> dict
         "r2_score": float(r2_score(y_test, y_pred_lr)),
     }
 
-    rf = RandomForestRegressor(n_estimators=100, random_state=42)
+    rf = RandomForestRegressor(n_estimators=2, random_state=42)
     rf.fit(X_train_scaled, y_train)
     y_pred_rf = rf.predict(X_test_scaled)
     models["random_forest"] = {
@@ -205,7 +205,7 @@ def train_regression_models(df: pd.DataFrame, target_col: str = "Close") -> dict
     }
 
     if XGBOOST_AVAILABLE and XGBRegressor is not None:
-        xgb = XGBRegressor(n_estimators=100, random_state=42)
+        xgb = XGBRegressor(n_estimators=2, random_state=42)
         xgb.fit(X_train_scaled, y_train)
         y_pred_xgb = xgb.predict(X_test_scaled)
         models["xgboost"] = {

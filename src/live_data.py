@@ -7,7 +7,6 @@ import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import time
-import streamlit as st
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 # Ensure project root and src are importable
@@ -160,7 +159,7 @@ class LiveStockData:
             # Use the existing add_technical_indicators function
             return add_technical_indicators(df)
         except Exception as e:
-            st.warning(f"Error calculating technical indicators: {e}")
+            print(f"Warning: Error calculating technical indicators: {e}")
             return df
 
     def get_current_price(self, ticker: str) -> Dict:
@@ -250,9 +249,51 @@ class LiveNewsData:
         """
         self.news_api_key = news_api_key or os.getenv('NEWS_API_KEY')
         self.cache_duration = cache_duration
-        self.cache = None
-        self.last_update = 0
+        self.cache = {}
+        self.last_update = {}
         self.sentiment_analyzer = SentimentIntensityAnalyzer()
+
+    def get_historical_sentiment(self, query: str, limit: int = 100) -> pd.DataFrame:
+        """Fetch up to 90 days of news and calculate daily sentiment average."""
+        try:
+            import feedparser
+            from dateutil import parser
+            import urllib.parse
+            
+            search_term = getattr(self, 'company_map', {}).get(query, query)
+            q = urllib.parse.quote_plus(search_term + " stock NSE")
+            # Force Google News to return 90 days of history
+            google_rss = f"https://news.google.com/rss/search?q={q}+when:90d&hl=en-IN&gl=IN&ceid=IN:en"
+            
+            feed = feedparser.parse(google_rss)
+            
+            data = []
+            for entry in feed.entries[:limit]:
+                title = entry.get('title', '')
+                term_parts = search_term.lower().split()
+                if term_parts and term_parts[0] not in title.lower():
+                    continue
+                    
+                try:
+                    pub_date = parser.parse(entry.get('published', '')).date()
+                except Exception:
+                    continue
+                    
+                score = self.sentiment_analyzer.polarity_scores(title)['compound']
+                data.append({'Date': pd.to_datetime(pub_date), 'Sentiment': score})
+                
+            if not data:
+                return pd.DataFrame(columns=['Date', 'Sentiment'])
+                
+            df = pd.DataFrame(data)
+            # Average sentiment per day
+            daily_sentiment = df.groupby('Date')['Sentiment'].mean().reset_index()
+            daily_sentiment = daily_sentiment.sort_values('Date')
+            return daily_sentiment
+            
+        except Exception as e:
+            print("Error fetching historical sentiment:", e)
+            return pd.DataFrame(columns=['Date', 'Sentiment'])
 
     def get_live_news(self, query: str = "Indian stock market OR NSE OR BSE", limit: int = 20) -> pd.DataFrame:
         """
@@ -268,10 +309,11 @@ class LiveNewsData:
         current_time = time.time()
 
         # Check if we have cached data that's still fresh
-        if (self.cache is not None and
-            current_time - self.last_update < self.cache_duration):
-            print(f"Returning cached news data ({len(self.cache)} articles)")
-            return self.cache.copy()
+        if query in self.cache:
+            cached_df, last_update = self.cache[query]
+            if current_time - last_update < self.cache_duration:
+                print(f"Returning cached news data for {query} ({len(cached_df)} articles)")
+                return cached_df.copy()
 
         news_data = []
 
@@ -386,8 +428,8 @@ class LiveNewsData:
         else:
             self.news_api_key = None
         # Clear cache so subsequent calls use the new key
-        self.cache = None
-        self.last_update = 0
+        self.cache = {}
+        self.last_update = {}
 
     def _fetch_from_newsapi(self, query: str, limit: int) -> List[Dict]:
         """Fetch news from NewsAPI"""
@@ -440,23 +482,51 @@ class LiveNewsData:
             print("Warning: feedparser not installed, cannot fetch RSS news")
             return []
 
-        rss_feeds = [
-            'https://www.moneycontrol.com/rss/latestnews.xml',
-            'https://www.livemint.com/rss/markets',
-            'https://www.thehindubusinessline.com/markets/?service=rss',
-            'https://economictimes.indiatimes.com/rssfeeds/2146843.cms'
-        ]
-
-        # If a query is provided, prepend a Google News RSS search for that query
-        # to get more real-time, query-specific results.
-        if query and isinstance(query, str) and query.strip():
+        # If a specific query is requested, ONLY use Google News search for that specific query.
+        # Otherwise, use general market feeds.
+        rss_feeds = []
+        is_specific = False
+        
+        if query and isinstance(query, str) and query.strip() and query != "Indian stock market OR NSE OR BSE":
+            is_specific = True
             try:
                 import urllib.parse
-                q = urllib.parse.quote_plus(query + " stock market NSE BSE")
+                # Map some common tickers to company names to improve search
+                self.company_map = {
+                    "INFY": "Infosys",
+                    "RELIANCE": "Reliance Industries",
+                    "TCS": "TCS",
+                    "HDFCBANK": "HDFC Bank",
+                    "ICICIBANK": "ICICI Bank",
+                    "SBIN": "State Bank of India",
+                    "BHARTIARTL": "Bharti Airtel",
+                    "ITC": "ITC",
+                    "HINDUNILVR": "Hindustan Unilever",
+                    "LT": "Larsen & Toubro",
+                    "BAJFINANCE": "Bajaj Finance",
+                    "AXISBANK": "Axis Bank",
+                    "KOTAKBANK": "Kotak Mahindra Bank",
+                    "MARUTI": "Maruti Suzuki",
+                    "TATAMOTORS": "Tata Motors",
+                    "SUNPHARMA": "Sun Pharma",
+                    "TITAN": "Titan Company",
+                    "ASIANPAINT": "Asian Paints",
+                    "BAJAJFINSV": "Bajaj Finserv",
+                    "ADANIPORTS": "Adani Ports"
+                }
+                search_term = getattr(self, 'company_map', {}).get(query, query)
+                q = urllib.parse.quote_plus(search_term + " stock NSE")
                 google_rss = f"https://news.google.com/rss/search?q={q}&hl=en-IN&gl=IN&ceid=IN:en"
-                rss_feeds.insert(0, google_rss)
+                rss_feeds = [google_rss]
             except Exception:
                 pass
+        else:
+            rss_feeds = [
+                'https://www.moneycontrol.com/rss/latestnews.xml',
+                'https://www.livemint.com/rss/markets',
+                'https://www.thehindubusinessline.com/markets/?service=rss',
+                'https://economictimes.indiatimes.com/rssfeeds/2146843.cms'
+            ]
 
         news_data = []
 

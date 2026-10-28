@@ -205,5 +205,6 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     """Generate complete feature set and drop initial NaN rows created by rolling windows."""
     df = add_technical_indicators(df, fillna_ffill_only=True)
     # Drop rows containing NaNs created by initial lookback windows (e.g. 50-period SMA)
-    df = df.dropna().reset_index(drop=True)
+    import numpy as np
+    df = df.replace([np.inf, -np.inf], np.nan).dropna().reset_index(drop=True)
     return df

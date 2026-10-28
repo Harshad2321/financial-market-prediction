@@ -9,8 +9,8 @@ _current_dir = os.path.dirname(os.path.abspath(__file__))
 _project_root = os.path.dirname(_current_dir)  # Go up from src/ to project root
 
 # Define data folder paths (compatible with Streamlit Cloud)
-NIFTY50_FOLDER = os.path.join(_project_root, "NSE-Data-main", "Nifty50 Stocks 20 Year Data")
-NSE_STOCKS_FOLDER = os.path.join(_project_root, "NSE-stock-market-historical-data-main", "v1")
+NIFTY50_FOLDER = os.path.join(_project_root, "data")
+NSE_STOCKS_FOLDER = os.path.join(_project_root, "data")
 
 
 @lru_cache(maxsize=32)

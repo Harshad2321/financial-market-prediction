@@ -9,30 +9,24 @@ venv/
 ENV/
 .venv/
 
-# Streamlit
-.streamlit/cache/
-*.log
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Environment variables
-.env
-.env.local
-
-# IDE
-.vscode/
-.idea/
-
-# User Data & Logs
+# Large binaries & models
+*.pkl
+models/
+data/processed_dataset.csv
 data/users.db
 data/logs/
 data/users/
+
+# Logs & temp
+*.log
+.DS_Store
+.DS_Store?
+._*
 app/static/users_cloud_data.zip
 app/static/users_sync.json
+
+# Environment
+.env
+.env.local
+
+.scratch_backup/
